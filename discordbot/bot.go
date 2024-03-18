@@ -49,6 +49,7 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 				// gateway.IntentDirectMessages,
 			),
 		),
+		bot.WithEventListeners(onyx.commandHandler()),
 		bot.WithEventListenerFunc(func(e *events.Ready) {
 			logger.Info("ready", slog.String("username", e.User.Username))
 		}),
@@ -114,6 +115,13 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 		msg := "failed to open gateway"
 		err := eris.Wrap(err, msg)
 		logger.Error(msg, slog.Any("error", err))
+		panic(err)
+	}
+
+	if err = handler.SyncCommands(client, commands, []snowflake.ID{testGuildID}); err != nil {
+		msg := "error while syncing commands"
+		err := eris.Wrap(err, msg)
+		logger.ErrorContext(ctx, msg, slog.Any("error", err))
 		panic(err)
 	}
 
