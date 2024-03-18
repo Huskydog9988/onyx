@@ -2,26 +2,37 @@ package discordbot
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
+	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/snowflake/v2"
 	"github.com/huskydog9988/onyx/state"
 	"github.com/rotisserie/eris"
 )
 
 var token = ""
+var testGuildID = snowflake.ID(492075852071174144)
 
 type Onyx struct {
 	client bot.Client
 	state  *state.State
+	logger *slog.Logger
+
+	avatarURL string
 }
 
 func New(ctx context.Context, logger *slog.Logger) *Onyx {
 
-	onyx := &Onyx{}
+	onyx := &Onyx{
+		// default avatar, replaced later
+		avatarURL: "https://i.ytimg.com/vi/RGS8A3j81fY/maxresdefault.jpg",
+	}
 
 	// create a new state
 	stateManager, err := state.New(ctx, logger)
@@ -63,6 +74,7 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 			// save message
 			onyx.state.GuildMessageCreate(ctx, state.GuildMessage{
 				MessageID: uint64(e.MessageID),
+				AuthorID:  uint64(e.Message.Author.ID),
 				Content:   e.Message.Content,
 			})
 		}),
@@ -102,6 +114,43 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 			}
 
 			logger.Info("message deleted", slog.String("content", msg.Content))
+
+			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.GuildID))
+			if err != nil {
+				logger.Error("failed to get log channel", slog.Any("error", err))
+				return
+			}
+
+			// member, ok := e.Client().Caches().Member(e.GuildID, snowflake.ID(msg.AuthorID))
+			// if !ok {
+			// 	logger.Error("failed to get user from cache")
+			// 	return
+			// }
+
+			user, err := e.Client().Rest().GetUser(snowflake.ID(msg.AuthorID))
+			if err != nil {
+				logger.Error("failed to get user", slog.Any("error", err))
+				return
+			}
+
+			// e.Client().Rest().CreateMessage(snowflake.ID(logChannelID), discord.NewMessageCreateBuilder().SetContent("Message deleted: "+msg.Content).Build())
+
+			embed := newOnyxLogEmbed()
+			embed.SetAuthor(*user)
+			embed.SetId("Message", e.MessageID)
+			embed.SetColor(OnyxLogEmbedColorWarn)
+			embed.AddField("Content", msg.Content, false)
+			embed.AddDateField()
+			embed.SetFooter(onyx.avatarURL)
+			embed.SetDescription(fmt.Sprintf("Message deleted in <#%d>", e.ChannelID))
+
+			_, err = e.Client().Rest().CreateMessage(snowflake.ID(logChannelID),
+				discord.NewMessageCreateBuilder().SetEmbeds(embed.Build()).Build())
+			if err != nil {
+				logger.Error("failed to send message", slog.Any("error", err))
+				return
+			}
+
 		}),
 	)
 	if err != nil {
