@@ -103,7 +103,7 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 		}),
 		bot.WithEventListenerFunc(func(e *events.GuildMessageUpdate) {
 			// get old message content
-			msg, err := onyx.state.GuildMessageGet(ctx, uint64(e.MessageID))
+			oldMsg, err := onyx.state.GuildMessageGet(ctx, uint64(e.MessageID))
 			if err != nil {
 				logger.Error("failed to get message", slog.Any("error", err))
 				return
@@ -119,11 +119,39 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 				return
 			}
 
-			logger.Info("message updated", slog.String("new", e.Message.Content), slog.String("old", msg.Content))
+			logger.Info("message updated", slog.String("new", e.Message.Content), slog.String("old", oldMsg.Content))
+
+			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.GuildID))
+			if err != nil {
+				logger.Error("failed to get log channel", slog.Any("error", err))
+				return
+			}
+
+			user, err := e.Client().Rest().GetUser(snowflake.ID(oldMsg.AuthorID))
+			if err != nil {
+				logger.Error("failed to get user", slog.Any("error", err))
+				return
+			}
+
+			embed := newOnyxLogEmbed()
+			embed.SetAuthor(*user)
+			embed.SetId("Message", e.MessageID)
+			embed.SetColor(OnyxLogEmbedColorPink)
+			embed.AddChannelField(e.Message)
+			embed.AddDifferanceFields(e.Message.Content, oldMsg.Content)
+			embed.SetFooter(onyx.avatarURL)
+			embed.SetDescription("Updated their message")
+
+			_, err = e.Client().Rest().CreateMessage(snowflake.ID(logChannelID),
+				discord.NewMessageCreateBuilder().SetEmbeds(embed.Build()).Build())
+			if err != nil {
+				logger.Error("failed to send message", slog.Any("error", err))
+				return
+			}
 		}),
 		bot.WithEventListenerFunc(func(e *events.GuildMessageDelete) {
 			// get old message content
-			msg, err := onyx.state.GuildMessageGet(ctx, uint64(e.MessageID))
+			oldMsg, err := onyx.state.GuildMessageGet(ctx, uint64(e.MessageID))
 			if err != nil {
 				logger.Error("failed to get message", slog.Any("error", err))
 				return
@@ -136,7 +164,7 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 				return
 			}
 
-			logger.Info("message deleted", slog.String("content", msg.Content))
+			logger.Info("message deleted", slog.String("content", oldMsg.Content))
 
 			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.GuildID))
 			if err != nil {
@@ -144,25 +172,17 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 				return
 			}
 
-			// member, ok := e.Client().Caches().Member(e.GuildID, snowflake.ID(msg.AuthorID))
-			// if !ok {
-			// 	logger.Error("failed to get user from cache")
-			// 	return
-			// }
-
-			user, err := e.Client().Rest().GetUser(snowflake.ID(msg.AuthorID))
+			user, err := e.Client().Rest().GetUser(snowflake.ID(oldMsg.AuthorID))
 			if err != nil {
 				logger.Error("failed to get user", slog.Any("error", err))
 				return
 			}
 
-			// e.Client().Rest().CreateMessage(snowflake.ID(logChannelID), discord.NewMessageCreateBuilder().SetContent("Message deleted: "+msg.Content).Build())
-
 			embed := newOnyxLogEmbed()
 			embed.SetAuthor(*user)
 			embed.SetId("Message", e.MessageID)
-			embed.SetColor(OnyxLogEmbedColorWarn)
-			embed.AddField("Content", msg.Content, false)
+			embed.SetColor(OnyxLogEmbedColorPurple)
+			embed.AddField("Content", oldMsg.Content, false)
 			embed.AddDateField()
 			embed.SetFooter(onyx.avatarURL)
 			embed.SetDescription(fmt.Sprintf("Message deleted in <#%d>", e.ChannelID))
