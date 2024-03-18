@@ -7,6 +7,7 @@ import (
 
 type GuildMessage struct {
 	MessageID uint64 `bun:",pk"`
+	AuthorID  uint64 `bun:",nullzero,notnull"`
 
 	Content string `bun:",nullzero,notnull"`
 
