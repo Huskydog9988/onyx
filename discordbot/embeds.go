@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	OnyxLogEmbedColorDanger = 0xD90202
-	OnyxLogEmbedColorWarn   = 0x822aed
-	OnyxLogEmbedColorInfo   = 0xBB29BB
+	OnyxLogEmbedColorRed    = 0xD90202
+	OnyxLogEmbedColorPurple = 0x822aed
+	OnyxLogEmbedColorPink   = 0xe62aed
 )
 
 type OnyxLogEmbed struct {
@@ -33,6 +33,22 @@ func newOnyxLogEmbed() OnyxLogEmbed {
 // sets the custom date field
 func (o *OnyxLogEmbed) AddDateField() {
 	o.AddField("Date", fmt.Sprintf("<t:%d:F>", o.time.Unix()), false)
+}
+
+// sets the channel field based on the message
+func (o *OnyxLogEmbed) AddChannelMessageField(msg discord.Message) {
+	o.AddField("Channel", fmt.Sprintf("<#%d>\n[Go To Message](%s)", msg.ChannelID, msg.JumpURL()), false)
+}
+
+// sets the channel field based on the channelID
+func (o *OnyxLogEmbed) AddChannelField(channelID snowflake.ID) {
+	o.AddField("Channel", fmt.Sprintf("<#%d>", channelID), false)
+}
+
+func (o *OnyxLogEmbed) AddDifferanceFields(now, previous string) {
+	o.AddField("Now", now, false)
+	o.AddField("Previous", previous, false)
+
 }
 
 func (o *OnyxLogEmbed) AddField(name, value string, inline bool) {

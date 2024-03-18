@@ -87,6 +87,66 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 
 			// onyx.avatarURL = *(user.AvatarURL())
 		}),
+		bot.WithEventListenerFunc(func(e *events.GuildVoiceJoin) {
+			logger.Info("joined vc", slog.Any("vc", e.VoiceState.ChannelID), slog.Any("user", e.VoiceState.UserID))
+
+			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.VoiceState.GuildID))
+			if err != nil {
+				logger.Error("failed to get log channel", slog.Any("error", err))
+				return
+			}
+
+			user, err := e.Client().Rest().GetUser(snowflake.ID(e.VoiceState.UserID))
+			if err != nil {
+				logger.Error("failed to get user", slog.Any("error", err))
+				return
+			}
+
+			embed := newOnyxLogEmbed()
+			embed.SetAuthor(*user)
+			embed.SetId("Channel", *e.VoiceState.ChannelID)
+			// embed.SetColor(OnyxLogEmbedColorPink)
+			embed.AddChannelField(*e.VoiceState.ChannelID)
+			embed.SetFooter(onyx.avatarURL)
+			embed.SetDescription("Joined voice channel")
+
+			_, err = e.Client().Rest().CreateMessage(snowflake.ID(logChannelID),
+				discord.NewMessageCreateBuilder().SetEmbeds(embed.Build()).Build())
+			if err != nil {
+				logger.Error("failed to send message", slog.Any("error", err))
+				return
+			}
+		}),
+		bot.WithEventListenerFunc(func(e *events.GuildVoiceLeave) {
+			logger.Info("left vc", slog.Any("vc", e.VoiceState.ChannelID), slog.Any("user", e.VoiceState.UserID))
+
+			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.VoiceState.GuildID))
+			if err != nil {
+				logger.Error("failed to get log channel", slog.Any("error", err))
+				return
+			}
+
+			user, err := e.Client().Rest().GetUser(snowflake.ID(e.VoiceState.UserID))
+			if err != nil {
+				logger.Error("failed to get user", slog.Any("error", err))
+				return
+			}
+
+			embed := newOnyxLogEmbed()
+			embed.SetAuthor(*user)
+			embed.SetId("Channel", *e.VoiceState.ChannelID)
+			// embed.SetColor(OnyxLogEmbedColorPink)
+			embed.AddChannelField(*e.VoiceState.ChannelID)
+			embed.SetFooter(onyx.avatarURL)
+			embed.SetDescription("Left voice channel")
+
+			_, err = e.Client().Rest().CreateMessage(snowflake.ID(logChannelID),
+				discord.NewMessageCreateBuilder().SetEmbeds(embed.Build()).Build())
+			if err != nil {
+				logger.Error("failed to send message", slog.Any("error", err))
+				return
+			}
+		}),
 		// add event listeners
 		bot.WithEventListenerFunc(func(e *events.MessageCreate) {
 			// ignore bot messages
@@ -137,7 +197,7 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 			embed.SetAuthor(*user)
 			embed.SetId("Message", e.MessageID)
 			embed.SetColor(OnyxLogEmbedColorPink)
-			embed.AddChannelField(e.Message)
+			embed.AddChannelMessageField(e.Message)
 			embed.AddDifferanceFields(e.Message.Content, oldMsg.Content)
 			embed.SetFooter(onyx.avatarURL)
 			embed.SetDescription("Updated their message")
