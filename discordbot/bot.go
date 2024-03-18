@@ -65,8 +65,27 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 
 		bot.WithLogger(logger.WithGroup("disgo")),
 		bot.WithEventListeners(onyx.commandHandler()),
+
+		// bot.WithCacheConfigOpts(
+		// 	cache.WithCaches(
+		// 	// cache.FlagChannels,
+		// 	// cache.FlagRoles,
+		// 	// cache.FlagMembers,
+		// 	),
+		// ),
+
 		bot.WithEventListenerFunc(func(e *events.Ready) {
 			logger.Info("ready", slog.String("username", e.User.Username))
+
+			// for some reason the below causes a panic
+
+			// user, err := e.Client().Rest().GetUser(e.User.ID)
+			// if err != nil {
+			// 	logger.Error("failed to get user", slog.Any("error", err))
+			// 	return
+			// }
+
+			// onyx.avatarURL = *(user.AvatarURL())
 		}),
 		// add event listeners
 		bot.WithEventListenerFunc(func(e *events.MessageCreate) {
