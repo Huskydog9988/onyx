@@ -47,6 +47,8 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 	client, err := disgo.New(token,
 		// set gateway options
 		bot.WithGatewayConfigOpts(
+			gateway.WithAutoReconnect(true),
+
 			// set enabled intents
 			gateway.WithIntents(
 				// https://discord.com/developers/docs/topics/gateway#list-of-intents
@@ -60,6 +62,8 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 				// gateway.IntentDirectMessages,
 			),
 		),
+
+		bot.WithLogger(logger.WithGroup("disgo")),
 		bot.WithEventListeners(onyx.commandHandler()),
 		bot.WithEventListenerFunc(func(e *events.Ready) {
 			logger.Info("ready", slog.String("username", e.User.Username))
