@@ -7,6 +7,7 @@ import (
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/cache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
@@ -66,13 +67,14 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 		bot.WithLogger(logger.WithGroup("disgo")),
 		bot.WithEventListeners(onyx.commandHandler()),
 
-		// bot.WithCacheConfigOpts(
-		// 	cache.WithCaches(
-		// 	// cache.FlagChannels,
-		// 	// cache.FlagRoles,
-		// 	// cache.FlagMembers,
-		// 	),
-		// ),
+		bot.WithCacheConfigOpts(
+			cache.WithCaches(
+				cache.FlagVoiceStates,
+			// cache.FlagChannels,
+			// cache.FlagRoles,
+			// cache.FlagMembers,
+			),
+		),
 
 		bot.WithEventListenerFunc(func(e *events.Ready) {
 			logger.Info("ready", slog.String("username", e.User.Username))
@@ -86,6 +88,38 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 			// }
 
 			// onyx.avatarURL = *(user.AvatarURL())
+		}),
+		bot.WithEventListenerFunc(func(e *events.GuildVoiceMove) {
+			logger.Info("moved vc", slog.Any("now", e.VoiceState.ChannelID), slog.Any("previous", e.OldVoiceState.ChannelID), slog.Any("user", e.VoiceState.UserID))
+
+			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.VoiceState.GuildID))
+			if err != nil {
+				logger.Error("failed to get log channel", slog.Any("error", err))
+				return
+			}
+
+			user, err := e.Client().Rest().GetUser(snowflake.ID(e.VoiceState.UserID))
+			if err != nil {
+				logger.Error("failed to get user", slog.Any("error", err))
+				return
+			}
+
+			embed := newOnyxLogEmbed()
+			embed.SetAuthor(*user)
+			embed.SetId("Now", *e.VoiceState.ChannelID)
+			embed.SetId("Previous", *e.OldVoiceState.ChannelID)
+			// embed.SetColor(OnyxLogEmbedColorPink)
+			// embed.AddChannelField(*e.VoiceState.ChannelID)
+			embed.AddDifferanceFields(fmt.Sprintf("<#%d>", *e.VoiceState.ChannelID), fmt.Sprintf("<#%d>", *e.OldVoiceState.ChannelID))
+			embed.SetFooter(onyx.avatarURL)
+			embed.SetDescription("Moved voice channel")
+
+			_, err = e.Client().Rest().CreateMessage(snowflake.ID(logChannelID),
+				discord.NewMessageCreateBuilder().SetEmbeds(embed.Build()).Build())
+			if err != nil {
+				logger.Error("failed to send message", slog.Any("error", err))
+				return
+			}
 		}),
 		bot.WithEventListenerFunc(func(e *events.GuildVoiceJoin) {
 			logger.Info("joined vc", slog.Any("vc", e.VoiceState.ChannelID), slog.Any("user", e.VoiceState.UserID))
