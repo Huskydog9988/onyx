@@ -16,9 +16,10 @@ A simple logging bot for discord. Aims to be a complete replacement for [Logger]
 - [x] messageDelete
 - [ ] messageDeleteBulk
 - [x] messageUpdate
-- [ ] guildMemberAdd
+- [x] guildMemberAdd
+  - [ ] track invite used
 - [ ] guildMemberKick
-- [ ] guildMemberRemove
+- [x] guildMemberRemove
 - [ ] guildMemberUpdate
 - [ ] guildMemberNickUpdate
 - [x] voiceChannelLeave
