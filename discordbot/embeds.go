@@ -56,9 +56,9 @@ func (o *OnyxLogEmbed) AddField(name, value string, inline bool) {
 }
 
 // sets the author field based on the user
-func (o *OnyxLogEmbed) SetAuthor(author discord.User) {
-	o.SetId("User", author.ID)
-	o.embed.SetAuthor(author.Username, "", *author.AvatarURL())
+func (o *OnyxLogEmbed) SetAuthor(user discord.User) {
+	o.SetId("User", user.ID)
+	o.embed.SetAuthor(fmt.Sprintf("%s#%s", user.Username, user.Discriminator), "", *user.AvatarURL())
 }
 
 func (o *OnyxLogEmbed) SetDescription(description string) {
