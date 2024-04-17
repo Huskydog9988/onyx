@@ -64,7 +64,8 @@ func (o *Onyx) settingsRouter() func(r handler.Router) {
 
 			o.state.GuildLogChannelSet(context.TODO(), uint64(*e.GuildID()), uint64(channel.ID))
 
-			return nil
+			_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().SetContentf("Now logging to <#%s>", channel.ID.String()).SetEphemeral(true).Build())
+			return err
 		})
 
 	}
