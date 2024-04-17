@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -88,6 +89,72 @@ func New(ctx context.Context, logger *slog.Logger) *Onyx {
 			// }
 
 			// onyx.avatarURL = *(user.AvatarURL())
+		}),
+		bot.WithEventListenerFunc(func(e *events.InviteCreate) {}),
+		bot.WithEventListenerFunc(func(e *events.InviteDelete) {}),
+
+		bot.WithEventListenerFunc(func(e *events.GuildMemberJoin) {
+			logger.Info("joined guild", slog.Any("user", e.Member.User.ID), slog.Any("guild", e.GuildID))
+
+			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.GuildID))
+			if err != nil {
+				logger.Error("failed to get log channel", slog.Any("error", err))
+				return
+			}
+
+			user, err := e.Client().Rest().GetUser(e.Member.User.ID)
+			if err != nil {
+				logger.Error("failed to get user", slog.Any("error", err))
+				return
+			}
+
+			embed := newOnyxLogEmbed()
+			embed.SetAuthor(*user)
+			embed.SetId("Guild", e.GuildID)
+			embed.AddDateField()
+			// TODO: need better formatting for account age
+			embed.AddField("Account Age", time.Since(e.Member.User.CreatedAt()).String(), false)
+			// embed.AddField("Member Count", fmt.Sprintf("%d", e.Member.), false)
+			embed.SetFooter(onyx.avatarURL)
+			embed.SetDescription(fmt.Sprintf("%s joined", e.Member.Mention()))
+
+			_, err = e.Client().Rest().CreateMessage(snowflake.ID(logChannelID),
+				discord.NewMessageCreateBuilder().SetEmbeds(embed.Build()).Build())
+			if err != nil {
+				logger.Error("failed to send message", slog.Any("error", err))
+				return
+			}
+
+		}),
+		bot.WithEventListenerFunc(func(e *events.GuildMemberLeave) {
+			logger.Info("left guild", slog.Any("user", e.User.ID), slog.Any("guild", e.GuildID))
+
+			logChannelID, err := onyx.state.GuildLogChannelGet(ctx, uint64(e.GuildID))
+			if err != nil {
+				logger.Error("failed to get log channel", slog.Any("error", err))
+				return
+			}
+
+			user, err := e.Client().Rest().GetUser(e.User.ID)
+			if err != nil {
+				logger.Error("failed to get user", slog.Any("error", err))
+				return
+			}
+
+			embed := newOnyxLogEmbed()
+			embed.SetAuthor(*user)
+			embed.SetId("Guild", e.GuildID)
+			embed.AddDateField()
+			// embed.AddField("Member Count", fmt.Sprintf("%d", e.Member.), false)
+			embed.SetFooter(onyx.avatarURL)
+			embed.SetDescription(fmt.Sprintf("%s left", e.User.Mention()))
+
+			_, err = e.Client().Rest().CreateMessage(snowflake.ID(logChannelID),
+				discord.NewMessageCreateBuilder().SetEmbeds(embed.Build()).Build())
+			if err != nil {
+				logger.Error("failed to send message", slog.Any("error", err))
+				return
+			}
 		}),
 		bot.WithEventListenerFunc(func(e *events.GuildVoiceMove) {
 			logger.Info("moved vc", slog.Any("now", e.VoiceState.ChannelID), slog.Any("previous", e.OldVoiceState.ChannelID), slog.Any("user", e.VoiceState.UserID))
